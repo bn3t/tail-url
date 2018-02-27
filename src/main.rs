@@ -49,7 +49,7 @@ fn get_body(url: &str, offset: u64, length: u64) -> &str {
     let result = client.get(url).header(Range::bytes(offset, length)).send();
     let text = result.map(|mut r: Response | -> reqwest::Result<String> { r.text() });
     match text {
-        Ok(s) => s.as_str(),
+        Ok(s) => "Maybe ok",
         Err(_) => ""
     }
 }
