@@ -44,39 +44,43 @@ fn get_length(url: &str) -> u64 {
     }
 }
 
-fn get_body(url: &str, offset: u64, length: u64) -> &str {
+fn get_body(url: &str, offset: u64, length: u64) -> String {
+    let mut buf = String::new();
+
     let client = Client::new();
-    let result = client.get(url).header(Range::bytes(offset, length)).send();
-    let text = result.map(|mut r: Response | -> reqwest::Result<String> { r.text() });
-    match text {
-        Ok(s) => "Maybe ok",
-        Err(_) => ""
+    let result = client
+        .get(url)
+        .header(Range::bytes(offset, length - 1))
+        .send();
+    if let Ok(mut resp) = result {
+        match resp.status() {
+            StatusCode::Ok | StatusCode::PartialContent => match resp.text() {
+                Ok(s) => buf.push_str(s.as_str()),
+                Err(err) => {
+                    println!("Err: {}", err);
+                }
+            },
+            _ => {}
+        }
     }
+    buf
 }
 
 fn run() -> Result<()> {
     let args: Vec<String> = env::args().collect();
 
     if args.len() > 1 {
-        for argument in env::args() {
-            println!("Argument: {}", argument);
-        }
         let url = &args[1];
 
         env_logger::init();
-
-        println!("url {}", url);
-
         if check_http_range(url) {
-            println!("Ok http range");
             let mut length = get_length(url);
-            println!("Length: {}", length);
-            let mut offset = length - 1000;
+            let mut offset = length;
             loop {
                 if offset < length {
-                    println!("Fetching offset=[{}], length=[{}]", offset, length);
+                    //println!("Fetching offset=[{}], length=[{}]", offset, length);
                     let body = get_body(url, offset, length);
-                    println!("Body {}", body);
+                    print!("{}", body);
                     offset = length;
                 }
                 thread::sleep_ms(1000);
