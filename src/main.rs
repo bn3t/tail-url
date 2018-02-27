@@ -10,7 +10,7 @@ extern crate reqwest;
 use std::env;
 use std::thread;
 
-use reqwest::{Client, StatusCode};
+use reqwest::{Client, Response, StatusCode};
 use reqwest::header::{AcceptRanges, ContentLength, Range};
 
 error_chain! {
@@ -47,12 +47,10 @@ fn get_length(url: &str) -> u64 {
 fn get_body(url: &str, offset: u64, length: u64) -> &str {
     let client = Client::new();
     let result = client.get(url).header(Range::bytes(offset, length)).send();
-    match match result {
-        Ok(res) => res.text(),
-        None => None
-    } {
-        Ok(text) => text.to_str(),
-        None => ""
+    let text = result.map(|mut r: Response | -> reqwest::Result<String> { r.text() });
+    match text {
+        Ok(s) => s.as_str(),
+        Err(_) => ""
     }
 }
 
