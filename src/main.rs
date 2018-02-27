@@ -1,8 +1,5 @@
 #![allow(warnings)] // remove when error_chain is fixed
 
-//! `cargo run --example simple`
-
-extern crate env_logger;
 #[macro_use]
 extern crate error_chain;
 extern crate reqwest;
@@ -20,27 +17,31 @@ error_chain! {
     }
 }
 
-fn check_http_range(url: &str) -> bool {
+fn check_http_range(url: &str) -> std::result::Result<bool, &str> {
     let client = Client::new();
-    let result = client.head(url).send();
-    match result {
-        Ok(res) => res.headers().has::<AcceptRanges>(),
-        Err(err) => false,
-    }
+    client
+        .head(url)
+        .send()
+        .map(|res| res.headers().has::<AcceptRanges>())
+        .map_err(|e| "Could not check http range")
+    // match result {
+    //     Ok(res) => Ok(res.headers().has::<AcceptRanges>()),
+    //     Err(err) => false,
+    // }
 }
 
-fn get_length(url: &str) -> u64 {
+fn get_length(url: &str) -> std::result::Result<u64, &str> {
     let client = reqwest::Client::new();
     let result = client.head(url).send();
     match result {
         Ok(res) => match res.headers().get::<ContentLength>() {
             Some(cl) => {
                 let &ContentLength(length) = cl;
-                length
+                Ok(length)
             }
-            None => 0,
+            None => Ok(0),
         },
-        Err(err) => 0,
+        Err(err) => Err("Could not get length"),
     }
 }
 
@@ -72,9 +73,8 @@ fn run() -> Result<()> {
     if args.len() > 1 {
         let url = &args[1];
 
-        env_logger::init();
-        if check_http_range(url) {
-            let mut length = get_length(url);
+        if check_http_range(url)? {
+            let mut length = get_length(url)?;
             let mut offset = length;
             loop {
                 if offset < length {
@@ -84,7 +84,7 @@ fn run() -> Result<()> {
                     offset = length;
                 }
                 thread::sleep_ms(1000);
-                length = get_length(url);
+                length = get_length(url)?;
             }
 
             let mut res = reqwest::get(url)?;
