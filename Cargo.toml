@@ -1,0 +1,6 @@
+[package]
+name = "tail-url"
+version = "0.1.0"
+authors = ["Bernard Niset <b.niset@evs.com>"]
+
+[dependencies]
