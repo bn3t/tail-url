@@ -24,10 +24,6 @@ fn check_http_range(url: &str) -> Result<bool> {
         .send()
         .map(|res| res.headers().has::<AcceptRanges>())
         .chain_err(|| "Could not check http range")
-    // match result {
-    //     Ok(res) => Ok(res.headers().has::<AcceptRanges>()),
-    //     Err(err) => false,
-    // }
 }
 
 fn get_length(url: &str) -> Result<u64> {
@@ -87,12 +83,6 @@ fn run() -> Result<()> {
         } else {
             println!("Http Range not supported by server, sorry!");
         }
-
-        //println!("Headers:\n{}", res.headers());
-
-        // copy the response body directly to stdout
-        //let _ = std::io::copy(&mut res, &mut std::io::stdout())?;
-
         println!("\n\nDone.");
         Ok(())
     } else {
