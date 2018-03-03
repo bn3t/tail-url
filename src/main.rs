@@ -47,32 +47,22 @@ fn get_length(url: &str) -> Result<u64> {
 }
 
 fn get_body(url: &str, offset: u64, length: u64) -> Result<String> {
-    let mut result: Result<String>;
-    let mut buf = String::new();
-
     let client = Client::new();
-    let resp = client
+    let mut resp = client
         .get(url)
         .header(Range::bytes(offset, length - 1))
-        .send();
-    if let Ok(mut resp) = resp {
-        result = match resp.status() {
-            StatusCode::Ok | StatusCode::PartialContent => match resp.text() {
-                Ok(s) => {
-                    buf.push_str(s.as_str());
-                    Ok(buf)
-                }
-                Err(err) => {
-                    println!("Err: {}", err);
-                    Err(format!("Error fetching text: {}", err).into())
-                }
-            },
-            _ => return Err("".into()),
-        }
-    } else {
-        result = Err("Request was not ok".into());
+        .send()
+        .chain_err(|| "Request was not ok")?;
+    match resp.status() {
+        StatusCode::Ok | StatusCode::PartialContent => match resp.text() {
+            Ok(s) => {
+                let buf = String::from(s.as_str());
+                Ok(buf)
+            }
+            Err(err) => Err(format!("Error fetching text: {}", err).into()),
+        },
+        code => Err(format!("Unexpected status code from server: {}", code).into()),
     }
-    result
 }
 
 fn run() -> Result<()> {
