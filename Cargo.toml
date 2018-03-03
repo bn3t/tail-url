@@ -7,3 +7,4 @@ authors = ["Bernard Niset <b.niset@evs.com>"]
 reqwest = "0.8.5"
 env_logger = "0.5.4"
 error-chain = "0.10"
+argparse = "0.2.1"
