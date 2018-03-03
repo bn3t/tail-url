@@ -1,14 +1,21 @@
 #![allow(warnings)] // remove when error_chain is fixed
 
+extern crate argparse;
 #[macro_use]
 extern crate error_chain;
 extern crate reqwest;
 
+use argparse::{ArgumentParser, Store, StoreOption};
 use std::env;
 use std::thread;
 
 use reqwest::{Client, Response, StatusCode};
 use reqwest::header::{AcceptRanges, ContentLength, Range};
+
+struct Options {
+    tail_offset: Option<u64>,
+    url: String,
+}
 
 error_chain! {
     foreign_links {
@@ -62,32 +69,47 @@ fn get_body(url: &str, offset: u64, length: u64) -> Result<String> {
 }
 
 fn run() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() > 1 {
-        let url = &args[1];
-
-        if check_http_range(url)? {
-            let mut length = get_length(url)?;
-            let mut offset = length;
-            loop {
-                if offset < length {
-                    //println!("Fetching offset=[{}], length=[{}]", offset, length);
-                    let body = get_body(url, offset, length);
-                    print!("{}", body?);
-                    offset = length;
-                }
-                thread::sleep_ms(1000);
-                length = get_length(url)?;
-            }
-        } else {
-            println!("Http Range not supported by server, sorry!");
-        }
-        println!("\n\nDone.");
-        Ok(())
-    } else {
-        Err("No url provided".into())
+    let mut options = Options {
+        tail_offset: None,
+        url: String::new(),
+    };
+    {
+        let mut ap = ArgumentParser::new();
+        ap.set_description("Tail text coming from an URL");
+        ap.refer(&mut options.tail_offset).add_option(
+            &["-t"],
+            StoreOption,
+            "Ttarting tail offset in bytes",
+        );
+        ap.refer(&mut options.url)
+            .add_argument("url", Store, "URL to tail")
+            .required();
+        ap.parse_args_or_exit();
     }
+
+    if check_http_range(options.url.as_str())? {
+        let mut length = get_length(options.url.as_str())?;
+        let mut offset = match options.tail_offset {
+            Some(n) => if n < length {
+                n
+            } else {
+                length
+            },
+            None => length,
+        };
+        loop {
+            if offset < length {
+                let body = get_body(options.url.as_str(), offset, length);
+                print!("{}", body?);
+                offset = length;
+            }
+            thread::sleep_ms(1000);
+            length = get_length(options.url.as_str())?;
+        }
+    } else {
+        println!("Http Range not supported by server, sorry!");
+    }
+    Ok(())
 }
 
 quick_main!(run);
