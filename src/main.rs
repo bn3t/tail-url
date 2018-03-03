@@ -17,54 +17,62 @@ error_chain! {
     }
 }
 
-fn check_http_range(url: &str) -> std::result::Result<bool, &str> {
+fn check_http_range(url: &str) -> Result<bool> {
     let client = Client::new();
     client
         .head(url)
         .send()
         .map(|res| res.headers().has::<AcceptRanges>())
-        .map_err(|e| "Could not check http range")
+        .chain_err(|| "Could not check http range")
     // match result {
     //     Ok(res) => Ok(res.headers().has::<AcceptRanges>()),
     //     Err(err) => false,
     // }
 }
 
-fn get_length(url: &str) -> std::result::Result<u64, &str> {
+fn get_length(url: &str) -> Result<u64> {
     let client = reqwest::Client::new();
-    let result = client.head(url).send();
-    match result {
-        Ok(res) => match res.headers().get::<ContentLength>() {
-            Some(cl) => {
-                let &ContentLength(length) = cl;
-                Ok(length)
-            }
-            None => Ok(0),
-        },
-        Err(err) => Err("Could not get length"),
-    }
+    let res = client
+        .head(url)
+        .send()
+        .chain_err(|| "Could not get length")?;
+
+    res.headers()
+        .get::<ContentLength>()
+        .ok_or("No Content-Length in url".into())
+        .map(|cl| {
+            let &ContentLength(length) = cl;
+            length
+        })
 }
 
-fn get_body(url: &str, offset: u64, length: u64) -> String {
+fn get_body(url: &str, offset: u64, length: u64) -> Result<String> {
+    let mut result: Result<String>;
     let mut buf = String::new();
 
     let client = Client::new();
-    let result = client
+    let resp = client
         .get(url)
         .header(Range::bytes(offset, length - 1))
         .send();
-    if let Ok(mut resp) = result {
-        match resp.status() {
+    if let Ok(mut resp) = resp {
+        result = match resp.status() {
             StatusCode::Ok | StatusCode::PartialContent => match resp.text() {
-                Ok(s) => buf.push_str(s.as_str()),
+                Ok(s) => {
+                    buf.push_str(s.as_str());
+                    Ok(buf)
+                }
                 Err(err) => {
                     println!("Err: {}", err);
+                    Err(format!("Error fetching text: {}", err).into())
                 }
             },
-            _ => {}
+            _ => return Err("".into()),
         }
+    } else {
+        result = Err("Request was not ok".into());
     }
-    buf
+    result
 }
 
 fn run() -> Result<()> {
@@ -80,7 +88,7 @@ fn run() -> Result<()> {
                 if offset < length {
                     //println!("Fetching offset=[{}], length=[{}]", offset, length);
                     let body = get_body(url, offset, length);
-                    print!("{}", body);
+                    print!("{}", body?);
                     offset = length;
                 }
                 thread::sleep_ms(1000);
