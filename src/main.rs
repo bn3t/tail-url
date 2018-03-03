@@ -94,16 +94,6 @@ fn run() -> Result<()> {
                 thread::sleep_ms(1000);
                 length = get_length(url)?;
             }
-
-            let mut res = reqwest::get(url)?;
-            match res.status() {
-                StatusCode::Ok => {
-                    println!("Status OK: {}", res.status());
-                }
-                _ => {
-                    println!("Status Not OK: {}", res.status());
-                }
-            }
         } else {
             println!("Http Range not supported by server, sorry!");
         }
