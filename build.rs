@@ -7,9 +7,12 @@ fn main() {
     // note: add error checking yourself.
     let output = Command::new("git")
         .args(&["rev-parse", "--short", "HEAD"])
-        .output()
-        .unwrap();
-    let git_hash = String::from_utf8(output.stdout).unwrap();
+        .output();
+    let git_hash = match output {
+        Ok(output) => String::from_utf8(output.stdout).unwrap(),
+        Err(_) => std::env::var("TRAVIS_COMMIT").unwrap(),
+    };
+
     println!("cargo:rustc-env=GIT_COMMIT={}", git_hash);
 
     let date = Local::now();
