@@ -1,0 +1,92 @@
+# Based on the "trust" template v0.1.2
+# https://github.com/japaric/trust/tree/v0.1.2
+
+environment:
+  global:
+  # TODO This is the Rust channel that build jobs will use by default but can be
+  # overridden on a case by case basis down below
+    RUST_VERSION: stable
+
+    # TODO Update this to match the name of your project.
+    CRATE_NAME: tail-url
+
+  # TODO These are all the build jobs. Adjust as necessary. Comment out what you
+  # don't need
+  matrix:
+    # MinGW
+    - TARGET: i686-pc-windows-gnu
+    - TARGET: x86_64-pc-windows-gnu
+
+    # MSVC
+    - TARGET: i686-pc-windows-msvc
+    - TARGET: x86_64-pc-windows-msvc
+
+    # Testing other channels
+    - TARGET: x86_64-pc-windows-gnu
+      RUST_VERSION: nightly
+    - TARGET: x86_64-pc-windows-msvc
+      RUST_VERSION: nightly
+
+install:
+  - ps: >-
+      If ($Env:TARGET -eq 'x86_64-pc-windows-gnu') {
+        $Env:PATH += ';C:\msys64\mingw64\bin'
+      } ElseIf ($Env:TARGET -eq 'i686-pc-windows-gnu') {
+        $Env:PATH += ';C:\msys64\mingw32\bin'
+      }
+  - curl -sSf -o rustup-init.exe https://win.rustup.rs/
+  - rustup-init.exe -y --default-host %TARGET% --default-toolchain %RUST_VERSION%
+  - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
+  - rustc -Vv
+  - cargo -V
+
+# TODO This is the "test phase", tweak it as you see fit
+test_script:
+  # we don't run the "test phase" when doing deploys
+  - if [%APPVEYOR_REPO_TAG%]==[false] (
+      cargo build --target %TARGET% &&
+      cargo build --target %TARGET% --release &&
+      cargo test --target %TARGET% &&
+      cargo test --target %TARGET% --release
+    )
+
+before_deploy:
+  # TODO Update this to build the artifacts that matter to you
+  - cargo rustc --target %TARGET% --release --bin tail-url -- -C lto
+  - ps: ci\before_deploy.ps1
+
+deploy:
+  artifact: /.*\.zip/
+  # TODO update `auth_token.secure`. Done.
+  # - Create a `public_repo` GitHub token. Go to: https://github.com/settings/tokens/new
+  # - Encrypt it. Go to https://ci.appveyor.com/tools/encrypt
+  # - Paste the output down here
+  auth_token:
+    secure: "dIR4KhS8sDqD6u3WihOOLa1Y3tJGGQ8T5XNQJMhdAl86kZOVA/73lb+G1h444B8+LHsre8jSBXByl+8He+PARcLU9W9dS5WUAkwL21xM7C+c9P2wNZChDXMd+FNv9fZO8vGt0Jz7Dmuu7NCm/s3YDh38Zay6QEEtQ89yPyZDtdpPagOAWT99TM6HPfNp0XkQZaZFTNvNRTmh1gV6E8Zf/0vUzzOCfiG0cAIA4h9HzWYW/QFrB51PrQmu2Nswx+0B3jSOIuU3Os4R1bT8s3zhHhRMrl6pctqxkThc7vWYhQmv1U+VdYdhqvvwn0cNtfZWMkhE7WmTVhjkUF5zG/j8cSEKHjghQHN3cBmGmwRk2umnX1dp8n5M+EAxyz7DLeYWlr49VLkKBPiMVRzBMjP8a6vP6MDERPfF5i38ePdyw+Q6jwIOm5KtLKlQqgsB+eAAzoGurOcgMN1qo53vWnyBehMxDFMGMwEJObWQ1+qSPjBEU+vmlip9D2LwViS1bVIdkGrTsLuvogN+XVzMVIGbSGmiwNmOh/GAJi3542mdK++IVTJoHTCtFckXqUbMhwyqq9HpYLrjXwquOHTZuJ1hTSUENLklBhYkOQfNJRnK6aUzYfMMWwMHSKxW83MLa6WZ7aO2vEW+zgX+59PxCCOSOcjnBue3dFJauWAaPtUKtDk="
+  description: ''
+  on:
+    # TODO Here you can pick which targets will generate binary releases
+    # In this example, there are some targets that are tested using the stable
+    # and nightly channels. This condition makes sure there is only one release
+    # for such targets and that's generated using the stable channel
+    RUST_VERSION: stable
+    appveyor_repo_tag: true
+  provider: GitHub
+
+cache:
+  - C:\Users\appveyor\.cargo\registry
+  - target
+
+branches:
+  only:
+    # Release tags
+    - /^v\d+\.\d+\.\d+.*$/
+    - master
+    - develop
+
+notifications:
+  - provider: Email
+    on_build_success: false
+
+# Building is done in the test phase, so we disable Appveyor's build phase.
+build: false
