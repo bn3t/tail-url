@@ -84,6 +84,7 @@ branches:
     # Release tags
     - /^v\d+\.\d+\.\d+.*$/
     - master
+    - develop
 
 notifications:
   - provider: Email
