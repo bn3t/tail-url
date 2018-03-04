@@ -86,7 +86,15 @@ fn run() -> Result<()> {
             .required();
         ap.add_option(
             &["-v", "--version"],
-            Print(format!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")).to_string()),
+            Print(
+                format!(
+                    "{} {} ({} {})",
+                    env!("CARGO_PKG_NAME"),
+                    env!("CARGO_PKG_VERSION"),
+                    env!("GIT_COMMIT"),
+                    env!("BUILD_DATE")
+                ).to_string(),
+            ),
             "Show version",
         );
         ap.parse_args_or_exit();
