@@ -18,10 +18,10 @@ main() {
 	test -f Cargo.lock || cargo generate-lockfile
 
 	# TODO Update this to build the artifacts that matter to you. Done.
-	cross rustc --bin tail-url --target $TARGET --release -- -C lto
+	cross rustc --bin $CRATE_NAME --target $TARGET --release -- -C lto
 
 	# TODO Update this to package the right artifacts. Done.
-	cp target/$TARGET/release/tail-url $stage/
+	cp target/$TARGET/release/$CRATE_NAME $stage/ || cp target/$TARGET/release/$CRATE_NAME.exe $stage/
 
 	cd $stage
 	tar czf $src/$CRATE_NAME-$TRAVIS_TAG-$TARGET.tar.gz *
