@@ -5,7 +5,7 @@ extern crate argparse;
 extern crate error_chain;
 extern crate reqwest;
 
-use argparse::{ArgumentParser, Store, StoreOption};
+use argparse::{ArgumentParser, Print, Store, StoreOption};
 use std::env;
 use std::thread;
 
@@ -84,6 +84,11 @@ fn run() -> Result<()> {
         ap.refer(&mut options.url)
             .add_argument("url", Store, "URL to tail")
             .required();
+        ap.add_option(
+            &["-v", "--version"],
+            Print(format!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")).to_string()),
+            "Show version",
+        );
         ap.parse_args_or_exit();
     }
 
