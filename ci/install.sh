@@ -31,7 +31,7 @@ main() {
 	esac
 
 	# This fetches latest stable release
-	local tag=$(git ls-remote --tags --refs --exit-code https://github.com/bn3t/tail-url |
+	local tag=$(git ls-remote --tags --refs --exit-code https://github.com/japaric/cross |
 		cut -d/ -f3 |
 		grep -E '^v[0.1.0-9.]+$' |
 		$sort --version-sort |
@@ -39,7 +39,7 @@ main() {
 	curl -LSfs https://japaric.github.io/trust/install.sh |
 		sh -s -- \
 			--force \
-			--git bn3t/tail-url \
+			--git japaric/cross \
 			--tag $tag \
 			--target $target
 }
