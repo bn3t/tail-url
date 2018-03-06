@@ -24,47 +24,63 @@ error_chain! {
     }
 }
 
-fn check_http_range(url: &str) -> Result<bool> {
-    let client = Client::new();
-    client
-        .head(url)
-        .send()
-        .map(|res| res.headers().has::<AcceptRanges>())
-        .chain_err(|| "Could not check http range")
+struct TrailHttpClient {
+    client: Client,
 }
 
-fn get_length(url: &str) -> Result<u64> {
-    let client = reqwest::Client::new();
-    let res = client
-        .head(url)
-        .send()
-        .chain_err(|| "Could not get length")?;
-
-    res.headers()
-        .get::<ContentLength>()
-        .ok_or("No Content-Length in url".into())
-        .map(|cl| {
-            let &ContentLength(length) = cl;
-            length
-        })
+impl TrailHttpClient {
+    pub fn new() -> TrailHttpClient {
+        let client = Client::new();
+        TrailHttpClient { client: client }
+    }
 }
 
-fn get_body(url: &str, offset: u64, length: u64) -> Result<String> {
-    let client = Client::new();
-    let mut resp = client
-        .get(url)
-        .header(Range::bytes(offset, length - 1))
-        .send()
-        .chain_err(|| "Request was not ok")?;
-    match resp.status() {
-        StatusCode::Ok | StatusCode::PartialContent => match resp.text() {
-            Ok(s) => {
-                let buf = String::from(s.as_str());
-                Ok(buf)
-            }
-            Err(err) => Err(format!("Error fetching text: {}", err).into()),
-        },
-        code => Err(format!("Unexpected status code from server: {}", code).into()),
+trait HttpClient {
+    fn has_http_range(&self, url: &str) -> Result<bool>;
+    fn get_length(&self, url: &str) -> Result<u64>;
+    fn get_body(&self, url: &str, offset: u64, length: u64) -> Result<String>;
+}
+
+impl HttpClient for TrailHttpClient {
+    fn has_http_range(&self, url: &str) -> Result<bool> {
+        self.client
+            .head(url)
+            .send()
+            .map(|res| res.headers().has::<AcceptRanges>())
+            .chain_err(|| "Could not check http range")
+    }
+
+    fn get_length(&self, url: &str) -> Result<u64> {
+        let res = self.client
+            .head(url)
+            .send()
+            .chain_err(|| "Could not get length")?;
+
+        res.headers()
+            .get::<ContentLength>()
+            .ok_or("No Content-Length in url".into())
+            .map(|cl| {
+                let &ContentLength(length) = cl;
+                length
+            })
+    }
+
+    fn get_body(&self, url: &str, offset: u64, length: u64) -> Result<String> {
+        let mut resp = self.client
+            .get(url)
+            .header(Range::bytes(offset, length - 1))
+            .send()
+            .chain_err(|| "Request was not ok")?;
+        match resp.status() {
+            StatusCode::Ok | StatusCode::PartialContent => match resp.text() {
+                Ok(s) => {
+                    let buf = String::from(s.as_str());
+                    Ok(buf)
+                }
+                Err(err) => Err(format!("Error fetching text: {}", err).into()),
+            },
+            code => Err(format!("Unexpected status code from server: {}", code).into()),
+        }
     }
 }
 
@@ -100,8 +116,10 @@ fn run() -> Result<()> {
         ap.parse_args_or_exit();
     }
 
-    if check_http_range(options.url.as_str())? {
-        let mut length = get_length(options.url.as_str())?;
+    let http_client = TrailHttpClient::new();
+
+    if http_client.has_http_range(options.url.as_str())? {
+        let mut length = http_client.get_length(options.url.as_str())?;
         let mut offset = match options.tail_offset {
             Some(n) => if n < length {
                 n
@@ -112,12 +130,12 @@ fn run() -> Result<()> {
         };
         loop {
             if offset < length {
-                let body = get_body(options.url.as_str(), offset, length);
+                let body = http_client.get_body(options.url.as_str(), offset, length);
                 print!("{}", body?);
                 offset = length;
             }
             thread::sleep_ms(1000);
-            length = get_length(options.url.as_str())?;
+            length = http_client.get_length(options.url.as_str())?;
         }
     } else {
         println!("Http Range not supported by server, sorry!");
