@@ -1,10 +1,15 @@
 [package]
 name = "tail-url"
-version = "0.9.3"
+version = "0.9.4"
 authors = ["Bernard Niset <b.niset@evs.com>"]
+build = "build.rs"
+
 
 [dependencies]
 reqwest = "0.8.5"
 env_logger = "0.5.4"
 error-chain = "0.10"
 argparse = "0.2.1"
+
+[build-dependencies]
+chrono = "0.4.0"
