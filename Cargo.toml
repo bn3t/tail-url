@@ -1,6 +1,6 @@
 [package]
 name = "tail-url"
-version = "0.9.4-pre"
+version = "0.9.4"
 authors = ["Bernard Niset <b.niset@evs.com>"]
 build = "build.rs"
 
