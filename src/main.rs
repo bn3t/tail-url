@@ -5,7 +5,7 @@ extern crate argparse;
 extern crate error_chain;
 extern crate reqwest;
 
-use argparse::{ArgumentParser, Print, Store, StoreOption};
+use argparse::{ArgumentParser, Print, Store, StoreOption, StoreTrue};
 
 use std::io::{stderr, stdout};
 use std::env;
@@ -17,6 +17,7 @@ use reqwest::header::{AcceptRanges, ContentLength, Range};
 
 struct Options {
     tail_offset: Option<u64>,
+    reverse_tail_offset: bool,
     url: String,
 }
 
@@ -103,6 +104,7 @@ impl Output for StdoutOutput {
 fn parse_options(args: Vec<String>) -> std::result::Result<Options, i32> {
     let mut options = Options {
         tail_offset: None,
+        reverse_tail_offset: false,
         url: String::new(),
     };
     {
@@ -112,6 +114,11 @@ fn parse_options(args: Vec<String>) -> std::result::Result<Options, i32> {
             &["-t"],
             StoreOption,
             "Starting tail offset in bytes",
+        );
+        ap.refer(&mut options.reverse_tail_offset).add_option(
+            &["-r"],
+            StoreTrue,
+            "Consider the tail offset from the end",
         );
         ap.refer(&mut options.url)
             .add_argument("url", Store, "URL to tail")
@@ -148,7 +155,11 @@ fn run_http_get<T: HttpClient, O: Output>(
         let mut length = http_client.get_length(options.url.as_str())?;
         let mut offset = match options.tail_offset {
             Some(n) => if n < length {
-                n
+                if options.reverse_tail_offset {
+                    length - n
+                } else {
+                    n
+                }
             } else {
                 length
             },
@@ -197,7 +208,7 @@ mod test_options {
     }
 
     #[test]
-    fn parse_valid_params_1() {
+    fn parse_valid_params_all_params() {
         let args = vec![
             String::from("tail-url"),
             String::from("-t"),
@@ -208,6 +219,24 @@ mod test_options {
         assert_eq!(options.is_ok(), true, "Returned options should be Ok");
         let options = options.unwrap();
         assert_eq!(options.tail_offset, Some(100));
+        assert_eq!(options.reverse_tail_offset, false);
+        assert_eq!(options.url, "my-url");
+    }
+
+    #[test]
+    fn parse_valid_params_tail_reverse() {
+        let args = vec![
+            String::from("tail-url"),
+            String::from("-t"),
+            String::from("100"),
+            String::from("-r"),
+            String::from("my-url"),
+        ];
+        let options = parse_options(args);
+        assert_eq!(options.is_ok(), true, "Returned options should be Ok");
+        let options = options.unwrap();
+        assert_eq!(options.tail_offset, Some(100));
+        assert_eq!(options.reverse_tail_offset, true);
         assert_eq!(options.url, "my-url");
     }
 
@@ -279,6 +308,7 @@ mod test_run_http_get {
         }
         let options = Options {
             tail_offset: None,
+            reverse_tail_offset: false,
             url: String::from("my-url"),
         };
         let mut stub_output = StubStdout {};
